@@ -1,0 +1,18 @@
+{
+	"folders":
+	[
+		{
+			"path": "source"
+		}
+	],
+	"build_systems":
+	[
+		{
+			"name": "dub",
+			"shell_cmd": "dub build --build=release",
+
+			"working_dir": "$project_path",
+			"file_regex": "^(.+)\\(([0-9]+),\\d+\\)(): (.+)$",
+		}
+	]
+}

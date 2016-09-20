@@ -1,0 +1,7 @@
+﻿{
+	"name": "tt-utils",
+	"description": "Misc utils extending phobos.",
+
+	"authors": [ "Temtaime" ],
+	"license": "Boost License"
+}
