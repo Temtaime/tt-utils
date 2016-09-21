@@ -3,5 +3,10 @@
 	"description": "Misc utils extending phobos.",
 
 	"authors": [ "Temtaime" ],
-	"license": "Boost License"
+	"license": "Boost License",
+
+	"dependencies":
+	{
+		"consoled": "==1.0.3",
+	},
 }

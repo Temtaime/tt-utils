@@ -102,7 +102,7 @@ auto encode(string s, ushort cp)
 	}
 	else
 	{
-		return toMBSz(s, cp).fromStringz;
+		return cast(string)toMBSz(s, cp).fromStringz;
 	}
 }
 
@@ -131,7 +131,7 @@ auto iconv(string s, string from, string to)
 		auto b = tmp.ptr;
 		auto bs = tmp.length;
 
-		auto c = iconv(h, cast(void **)&p, &len, &b, &bs);
+		auto c = iconv(h, cast(char **)&p, &len, &b, &bs);
 
 		c != size_t.max || errno == E2BIG || throwError(`conversion error`);
 		res ~= tmp[0..$ - bs];
@@ -145,6 +145,6 @@ private:
 extern(C):
 
 size_t iconv_open(in char *, in char *);
-size_t iconv(size_t, void **, size_t *, char **, size_t *);
+size_t iconv(size_t, char **, size_t *, char **, size_t *);
 
 int iconv_close(size_t);
