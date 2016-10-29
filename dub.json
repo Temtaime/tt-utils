@@ -3,7 +3,7 @@
 	"description": "Misc utils extending phobos.",
 
 	"authors": [ "Temtaime" ],
-	"license": "Boost License",
+	"license": "Zlib",
 
 	"dependencies":
 	{
