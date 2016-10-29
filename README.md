@@ -2,7 +2,7 @@
 
 ### License
 
- This library is licensed under Boost License.
+ This library is licensed under Zlib license.
 
 ### About
 
