@@ -449,7 +449,11 @@ private:
 
 auto binaryRead(T, bool UseDup = false, string f = __FILE__, uint l = __LINE__)(in void[] data)
 {
-	return data.BinaryReader!(MemoryReader!UseDup).read!(T, f, l);
+	auto r = data.BinaryReader!(MemoryReader!UseDup);
+	auto v = r.read!(T, f, l);
+
+	!r.reader.length || throwErrorImpl(f, l, `not all the buffer was parsed`);
+	return v;
 }
 
 auto binaryReadFile(T, string f = __FILE__, uint l = __LINE__)(string name)
@@ -475,7 +479,10 @@ const(void)[] binaryWrite(string f = __FILE__, uint l = __LINE__, T)(auto ref in
 
 void binaryWrite(string f = __FILE__, uint l = __LINE__, T)(void[] buf, auto ref in T data)
 {
-	buf.BinaryReader!(MemoryReader!()).write!(f, l)(data);
+	auto r = buf.BinaryReader!(MemoryReader!());
+	r.write!(f, l)(data);
+
+	!r.reader.length || throwErrorImpl(f, l, `not all the buffer was used`);
 }
 
 void binaryWriteFile(string f = __FILE__, uint l = __LINE__, T)(string name, auto ref in T data)
