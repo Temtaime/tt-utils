@@ -23,7 +23,7 @@ struct BinaryReader(Reader)
 		reader = Reader(args);
 	}
 
-	auto read(T, string f = __FILE__, uint l = __LINE__)() if(is(T == struct))
+	auto read(T)(string f = __FILE__, uint l = __LINE__) if(is(T == struct))
 	{
 		_l = l;
 		_f = f;
@@ -34,7 +34,7 @@ struct BinaryReader(Reader)
 		return t;
 	}
 
-	ref write(string f = __FILE__, uint l = __LINE__, T)(auto ref in T t) if(is(T == struct))
+	ref write(T)(auto ref in T t, string f = __FILE__, uint l = __LINE__) if(is(T == struct))
 	{
 		_l = l;
 		_f = f;
@@ -161,11 +161,11 @@ private:
 				static if(lenIdx >= 0)
 				{
 					enum isRest = false;
-					enum hasLength = true;
+					auto elemsCnt = cast(uint)StructExecuter!(attrs[lenIdx + 1])(data, parent, this);
 
-					static if(!isWrite)
+					static if(isWrite)
 					{
-						auto elemsCnt = cast(uint)StructExecuter!(attrs[lenIdx + 1])(data, parent, this);
+						assert(p.length == elemsCnt);
 					}
 				}
 				else
@@ -176,28 +176,25 @@ private:
 
 					static if(is(L))
 					{
+						L elemsCnt;
+
 						static if(isWrite)
 						{
 							assert(p.length <= L.max);
 
-							{
-								auto v = cast(L)p.length;
-								reader.write(v.toByte) || mixin(errorWrite);
-							}
+							elemsCnt = cast(L)p.length;
+							reader.write(elemsCnt.toByte) || mixin(errorWrite);
 						}
 						else
 						{
-							L elemsCnt;
 							reader.read(elemsCnt.toByte) || mixin(errorRead);
 						}
 
 						enum isRest = false;
-						enum hasLength = true;
 					}
 					else
 					{
 						enum isRest = staticIndexOf!(`rest`, attrs) >= 0;
-						enum hasLength = false;
 					}
 				}
 
@@ -206,11 +203,11 @@ private:
 
 				static if(isDyn)
 				{
-					static assert(isStr || hasLength || isRest, `length of ` ~ Elem ~ ` is unknown`);
+					static assert(isStr || is(typeof(elemsCnt)) || isRest, `length of ` ~ Elem ~ ` is unknown`);
 				}
 				else
 				{
-					static assert(!(hasLength || isRest), `static array ` ~ Elem ~ ` can't have a length`);
+					static assert(!(is(typeof(elemsCnt)) || isRest), `static array ` ~ Elem ~ ` can't have a length`);
 				}
 
 				static if(isElemSimple)
@@ -232,20 +229,18 @@ private:
 						}
 						else
 						{
+							ubyte[] arr;
+
+							static if(isRest)
 							{
-								ubyte[] arr;
-
-								static if(isRest)
-								{
-									!(reader.length % E.sizeof) && reader.read(arr, reader.length) || mixin(errorRead);
-								}
-								else
-								{
-									reader.read(arr, elemsCnt * cast(uint)E.sizeof) || mixin(errorRead);
-								}
-
-								*varPtr = arr.as!E;
+								!(reader.length % E.sizeof) && reader.read(arr, reader.length) || mixin(errorRead);
 							}
+							else
+							{
+								reader.read(arr, elemsCnt * cast(uint)E.sizeof) || mixin(errorRead);
+							}
+
+							*varPtr = (cast(E *)arr.ptr)[0..arr.length / E.sizeof];
 						}
 					}
 				}
@@ -268,11 +263,11 @@ private:
 					{
 						static if(isRest)
 						{
-							E v;
-
 							while(reader.length)
 							{
+								E v;
 								process!isWrite(v, parent);
+
 								*varPtr ~= v;
 							}
 						}
@@ -447,22 +442,22 @@ private:
 
 // ----------------------------------------- READ FUNCTIONS -----------------------------------------
 
-auto binaryRead(T, bool UseDup = false, string f = __FILE__, uint l = __LINE__)(in void[] data)
+auto binaryRead(T, bool UseDup = false)(in void[] data, string f = __FILE__, uint l = __LINE__)
 {
 	auto r = data.BinaryReader!(MemoryReader!UseDup);
-	auto v = r.read!(T, f, l);
+	auto v = r.read!T(f, l);
 
 	!r.reader.length || throwErrorImpl(f, l, `not all the buffer was parsed`);
 	return v;
 }
 
-auto binaryReadFile(T, string f = __FILE__, uint l = __LINE__)(string name)
+auto binaryReadFile(T)(string name, string f = __FILE__, uint l = __LINE__)
 {
 	auto m = new MmFile(name);
 
 	try
 	{
-		return m[].binaryRead!(T, true, f, l);
+		return m[].binaryRead!(T, true)(f, l);
 	}
 	finally
 	{
@@ -472,28 +467,27 @@ auto binaryReadFile(T, string f = __FILE__, uint l = __LINE__)(string name)
 
 // ----------------------------------------- WRITE FUNCTIONS -----------------------------------------
 
-const(void)[] binaryWrite(string f = __FILE__, uint l = __LINE__, T)(auto ref in T data)
+const(void)[] binaryWrite(T)(auto ref in T data, string f = __FILE__, uint l = __LINE__)
 {
-	return BinaryReader!AppendWriter().write!(f, l)(data).reader.data;
+	return BinaryReader!AppendWriter().write(data, f, l).reader.data;
 }
 
-void binaryWrite(string f = __FILE__, uint l = __LINE__, T)(void[] buf, auto ref in T data)
+void binaryWrite(T)(void[] buf, auto ref in T data, string f = __FILE__, uint l = __LINE__)
 {
 	auto r = buf.BinaryReader!(MemoryReader!());
-	r.write!(f, l)(data);
+	r.write(data, f, l);
 
 	!r.reader.length || throwErrorImpl(f, l, `not all the buffer was used`);
 }
 
-void binaryWriteFile(string f = __FILE__, uint l = __LINE__, T)(string name, auto ref in T data)
+void binaryWriteFile(T)(string name, auto ref in T data, string f = __FILE__, uint l = __LINE__)
 {
-	auto len = binaryWriteLen!(f, l)(data);
-
+	auto len = binaryWriteLen(data, f, l);
 	auto m = new MmFile(name, MmFile.Mode.readWriteNew, len, null);
 
 	try
 	{
-		binaryWrite!(f, l)(m[], data);
+		binaryWrite(m[], data, f, l);
 	}
 	finally
 	{
@@ -501,7 +495,7 @@ void binaryWriteFile(string f = __FILE__, uint l = __LINE__, T)(string name, aut
 	}
 }
 
-auto binaryWriteLen(string f = __FILE__, uint l = __LINE__, T)(auto ref in T data)
+auto binaryWriteLen(T)(auto ref in T data, string f = __FILE__, uint l = __LINE__)
 {
 	struct LengthCalc
 	{
@@ -520,7 +514,7 @@ auto binaryWriteLen(string f = __FILE__, uint l = __LINE__, T)(auto ref in T dat
 		uint length;
 	}
 
-	return BinaryReader!LengthCalc().write!(f, l)(data).reader.length;
+	return BinaryReader!LengthCalc().write(data, f, l).reader.length;
 }
 
 private:
