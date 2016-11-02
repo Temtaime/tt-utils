@@ -92,11 +92,11 @@ private:
 
 					static if(isWrite)
 					{
-						reader.rskip(cnt) || mixin(errorRSkip);
+						reader.wskip(cnt) || mixin(errorWSkip);
 					}
 					else
 					{
-						reader.wskip(cnt) || mixin(errorWSkip);
+						reader.rskip(cnt) || mixin(errorRSkip);
 					}
 				}
 			}
@@ -160,13 +160,14 @@ private:
 
 				static if(lenIdx >= 0)
 				{
-					enum isRest = false;
 					auto elemsCnt = cast(uint)StructExecuter!(attrs[lenIdx + 1])(data, parent, this);
 
 					static if(isWrite)
 					{
 						assert(p.length == elemsCnt);
 					}
+
+					enum isRest = false;
 				}
 				else
 				{
@@ -199,15 +200,16 @@ private:
 				}
 
 				enum isStr = is(R : string);
+				enum isLen = is(typeof(elemsCnt));
 				enum isDyn = isDynamicArray!R;
 
 				static if(isDyn)
 				{
-					static assert(isStr || is(typeof(elemsCnt)) || isRest, `length of ` ~ Elem ~ ` is unknown`);
+					static assert(isStr || isLen || isRest, `length of ` ~ Elem ~ ` is unknown`);
 				}
 				else
 				{
-					static assert(!(is(typeof(elemsCnt)) || isRest), `static array ` ~ Elem ~ ` can't have a length`);
+					static assert(!(isLen || isRest), `static array ` ~ Elem ~ ` can't have a length`);
 				}
 
 				static if(isElemSimple)
@@ -216,14 +218,14 @@ private:
 					{
 						reader.write(toByte(*p)) || mixin(errorWrite);
 
-						static if(isStr)
+						static if(isStr && !isLen)
 						{
 							reader.wskip(1) || mixin(errorWSkip);
 						}
 					}
 					else
 					{
-						static if(isStr)
+						static if(isStr && !isLen)
 						{
 							reader.readstr(*varPtr) || mixin(errorRead);
 						}
@@ -442,12 +444,12 @@ private:
 
 // ----------------------------------------- READ FUNCTIONS -----------------------------------------
 
-auto binaryRead(T, bool UseDup = false)(in void[] data, string f = __FILE__, uint l = __LINE__)
+auto binaryRead(T, bool UseDup = false)(in void[] data, bool canRest = false, string f = __FILE__, uint l = __LINE__)
 {
 	auto r = data.BinaryReader!(MemoryReader!UseDup);
 	auto v = r.read!T(f, l);
 
-	!r.reader.length || throwErrorImpl(f, l, `not all the buffer was parsed`);
+	!r.reader.length || canRest || throwErrorImpl(f, l, `not all the buffer was parsed, %u bytes rest`, r.reader.length);
 	return v;
 }
 
@@ -457,7 +459,7 @@ auto binaryReadFile(T)(string name, string f = __FILE__, uint l = __LINE__)
 
 	try
 	{
-		return m[].binaryRead!(T, true)(f, l);
+		return m[].binaryRead!(T, true)(false, f, l);
 	}
 	finally
 	{
@@ -472,12 +474,12 @@ const(void)[] binaryWrite(T)(auto ref in T data, string f = __FILE__, uint l = _
 	return BinaryReader!AppendWriter().write(data, f, l).reader.data;
 }
 
-void binaryWrite(T)(void[] buf, auto ref in T data, string f = __FILE__, uint l = __LINE__)
+void binaryWrite(T)(void[] buf, auto ref in T data, bool canRest = false, string f = __FILE__, uint l = __LINE__)
 {
 	auto r = buf.BinaryReader!(MemoryReader!());
 	r.write(data, f, l);
 
-	!r.reader.length || throwErrorImpl(f, l, `not all the buffer was used`);
+	!r.reader.length || canRest || throwErrorImpl(f, l, `not all the buffer was used, %u bytes rest`, r.reader.length);
 }
 
 void binaryWriteFile(T)(string name, auto ref in T data, string f = __FILE__, uint l = __LINE__)
@@ -487,7 +489,7 @@ void binaryWriteFile(T)(string name, auto ref in T data, string f = __FILE__, ui
 
 	try
 	{
-		binaryWrite(m[], data, f, l);
+		binaryWrite(m[], data, false, f, l);
 	}
 	finally
 	{
@@ -689,7 +691,7 @@ unittest
 	ubyte[] data =
 	[
 		12, 0, 0, 0,				// y
-		11, 0, 0, 0, 0, 0, 0, 0,	// u
+		11, 0, 0, 0, 0, 0, 0, 0,	// a
 		4, 0, 0, 0,					// S.k
 		65, 66, 67, 68,				// c
 		97, 98, 99, 0,				// d, null terminated
