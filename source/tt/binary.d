@@ -30,7 +30,7 @@ struct BinaryReader(Reader)
 		_info = T.stringof;
 
 		T t;
-		process(t, t);
+		process(t, t, t);
 		return t;
 	}
 
@@ -40,7 +40,7 @@ struct BinaryReader(Reader)
 		_f = f;
 		_info = T.stringof;
 
-		process!true(t, t);
+		process!true(t, t, t);
 		return this;
 	}
 
@@ -65,7 +65,7 @@ private:
 		enum errorValid = errorRead;
 	}
 
-	void process(bool isWrite = false, T, P)(ref T data, ref P parent)
+	void process(bool isWrite = false, T, S, P)(ref T data, ref S st, ref P parent)
 	{
 		foreach(name; FieldsToProcess!T)
 		{
@@ -88,7 +88,7 @@ private:
 
 				static if(idx >= 0)
 				{
-					auto cnt = cast(uint)StructExecuter!(attrs[idx + 1])(data, parent, this);
+					size_t cnt = StructExecuter!(attrs[idx + 1])(data, st, parent, reader);
 
 					static if(isWrite)
 					{
@@ -106,7 +106,7 @@ private:
 
 				static if(idx >= 0)
 				{
-					auto v = StructExecuter!(attrs[idx + 1])(data, parent, this);
+					auto v = StructExecuter!(attrs[idx + 1])(data, st, parent, reader);
 
 					if(v)
 					{
@@ -116,7 +116,7 @@ private:
 
 							static if(def >= 0)
 							{
-								*p = StructExecuter!(attrs[def + 1])(data, parent, this);
+								*p = StructExecuter!(attrs[def + 1])(data, st, parent, reader);
 							}
 						}
 
@@ -154,13 +154,13 @@ private:
 				alias E = ElementEncodingType!R;
 
 				enum isElemSimple = isDataSimple!E;
-				static assert(isElemSimple || is(E == struct), `can't serialize ` ~ Elem);
-
 				enum lenIdx = staticIndexOf!(`length`, attrs);
+
+				static assert(isElemSimple || is(E == struct), `can't serialize ` ~ Elem);
 
 				static if(lenIdx >= 0)
 				{
-					auto elemsCnt = cast(uint)StructExecuter!(attrs[lenIdx + 1])(data, parent, this);
+					uint elemsCnt = StructExecuter!(attrs[lenIdx + 1])(data, st, parent, reader);
 
 					static if(isWrite)
 					{
@@ -174,6 +174,7 @@ private:
 					static if(staticIndexOf!(`ubyte`, attrs) >= 0)			alias L = ubyte;
 					else static if(staticIndexOf!(`ushort`, attrs) >= 0)	alias L = ushort;
 					else static if(staticIndexOf!(`uint`, attrs) >= 0)		alias L = uint;
+					else static if(staticIndexOf!(`ulong`, attrs) >= 0)		alias L = ulong;
 
 					static if(is(L))
 					{
@@ -235,7 +236,7 @@ private:
 
 							static if(isRest)
 							{
-								!(reader.length % E.sizeof) && reader.read(arr, reader.length) || mixin(errorRead);
+								!(reader.length % E.sizeof) && reader.read(arr, cast(uint)reader.length) || mixin(errorRead);
 							}
 							else
 							{
@@ -258,7 +259,7 @@ private:
 					{
 						foreach(ref v; *p)
 						{
-							process!isWrite(v, parent);
+							process!isWrite(v, st, data);
 						}
 					}
 					else
@@ -268,7 +269,7 @@ private:
 							while(reader.length)
 							{
 								E v;
-								process!isWrite(v, parent);
+								process!isWrite(v, st, data);
 
 								*varPtr ~= v;
 							}
@@ -282,7 +283,7 @@ private:
 
 							foreach(ref v; *varPtr)
 							{
-								process!isWrite(v, parent);
+								process!isWrite(v, st, data);
 							}
 						}
 					}
@@ -301,7 +302,7 @@ private:
 					_info ~= `.` ~ name;
 				}
 
-				process!isWrite(*p, parent);
+				process!isWrite(*p, st, data);
 
 				debug
 				{
@@ -320,7 +321,7 @@ private:
 
 				static if(idx >= 0)
 				{
-					StructExecuter!(attrs[idx + 1])(data, parent, this) || mixin(errorValid);
+					StructExecuter!(attrs[idx + 1])(data, st, parent, reader) || mixin(errorValid);
 				}
 			}
 		}
@@ -398,7 +399,7 @@ struct MemoryReader(bool UseDup = false)
 		return true;
 	}
 
-	bool rskip(uint cnt)
+	bool rskip(size_t cnt)
 	{
 		if(length < cnt) return false;
 
@@ -406,18 +407,18 @@ struct MemoryReader(bool UseDup = false)
 		return true;
 	}
 
-	bool wskip(uint cnt)
+	bool wskip(size_t cnt)
 	{
 		if(length < cnt) return false;
 
-		_p[0..cnt] = 0;
+		//_p[0..cnt] = 0; // SKIP WHEN WRITING TO BUFFER DOESN'T WRITE ZEROS
 		_p += cnt;
 
 		return true;
 	}
 
 	const data() { return _p[0..length]; }
-	const length() { return cast(uint)(_end - _p); }
+	const length() { return cast(size_t)(_end - _p); }
 private:
 	ubyte *	_p,
 			_end;
@@ -431,13 +432,13 @@ struct AppendWriter
 		return true;
 	}
 
-	bool wskip(uint cnt)
+	bool wskip(size_t cnt)
 	{
 		_data.length += cnt;
 		return true;
 	}
 
-	const length() { return cast(uint)_data.length; }
+	const length() { return _data.length; }
 private:
 	mixin publicProperty!(ubyte[], `data`);
 }
@@ -559,9 +560,9 @@ template isDataSimple(T)
 	}
 }
 
-auto StructExecuter(alias _expr, T, P, B)(ref T IT, ref P STRUCT, ref B READER)
+auto StructExecuter(alias _expr, D, S, P, R)(ref D CUR, ref S STRUCT, ref P PARENT, ref R READER)
 {
-	with(IT)
+	with(CUR)
 	{
 		return mixin(_expr);
 	}
