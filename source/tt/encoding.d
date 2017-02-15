@@ -110,7 +110,7 @@ version(linux):
 
 auto iconv(string s, string from, string to)
 {
-	to ~= `//TRANSLIT//IGNORE`;
+	to ~= `//IGNORE//TRANSLIT`;
 
 	auto h = iconv_open(to.toStringz, from.toStringz);
 	h != size_t.max || throwError(`can't convert from %s to %s`, from, to);
