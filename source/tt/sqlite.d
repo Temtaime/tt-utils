@@ -2,6 +2,7 @@ module tt.sqlite;
 
 import
 		std.conv,
+		std.meta,
 		std.array,
 		std.string,
 		std.typecons,
@@ -28,11 +29,18 @@ final class SQLite
 		return format(`'%s'`, s.replace(`'`, `''`));
 	}
 
+	auto queryOne(T, A...)(auto ref in A args)
+	{
+		auto res = query!(Tuple!T)(args);
+		res.length == 1 || throwError(`a query must return exactly one row`);
+		return res[0];
+	}
+
 	auto query(T = void, A...)(string q, auto ref in A args)
 	{
 		static if(A.length)
 		{
-			q = format(q, staticMap!(argWrap, args));
+			q = format(q, escapeStrings!args);
 		}
 
 		static if(is(T == void))
@@ -81,16 +89,36 @@ final class SQLite
 	}
 
 private:
-	static argWrap(T)(T v)
-	{
-		static if(is(T : string)) return escape(v);
-		return v;
-	}
-
 	auto error()
 	{
 		return cast(string)sqlite3_errmsg(_db).fromStringz;
 	}
 
 	sqlite3 *_db;
+}
+
+template escapeStrings(Args...)
+{
+	static if(Args.length)
+	{
+		auto arg()
+		{
+			auto v = Args[0];
+
+			static if(is(typeof(v) : string))
+			{
+				return SQLite.escape(v);
+			}
+			else
+			{
+				return v;
+			}
+		}
+
+		alias escapeStrings = AliasSeq!(arg, escapeStrings!(Args[1..$]));
+	}
+	else
+	{
+		alias escapeStrings = AliasSeq!();
+	}
 }
