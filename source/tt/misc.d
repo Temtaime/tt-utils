@@ -12,19 +12,17 @@ mixin template publicProperty(T, string name, string value = null)
 																);
 }
 
-auto as(T, E)(ref E data)
+auto as(T, E)(E data) if(isDynamicArray!E)
 {
-	static if(isArray!E)
-	{
-		return cast(T[])data;
-	}
-	else
-	{
-		return cast(T[])(&data)[0..1];
-	}
+	return cast(T[])data;
 }
 
-auto toByte(T)(ref T data)
+auto as(T, E)(ref E data) if(!isDynamicArray!E)
+{
+	return cast(T[])(&data)[0..1];
+}
+
+auto toByte(T)(auto ref T data)
 {
 	return data.as!ubyte;
 }

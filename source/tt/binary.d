@@ -8,6 +8,7 @@ import
 		std.mmfile,
 		std.string,
 		std.traits,
+		std.typecons,
 		std.algorithm,
 		std.typetuple,
 		std.exception,
@@ -48,7 +49,7 @@ struct BinaryReader(Reader)
 private:
 	debug
 	{
-		enum errorRead = `throwErrorImpl(_f, _l, "can't read %s.%s variable", _info, name)`;
+		enum errorRead = `throwErrorImpl(_f, _l, "can't read %s.%s variable", _info, st)`;
 		enum errorWrite = `throwErrorImpl(_f, _l, "can't write %s.%s variable", _info, name)`;
 		enum errorRSkip = `throwErrorImpl(_f, _l, "can't skip when reading %s.%s variable", _info, name)`;
 		enum errorWSkip = `throwErrorImpl(_f, _l, "can't skip when writing %s.%s variable", _info, name)`;
@@ -70,13 +71,13 @@ private:
 		foreach(name; FieldsToProcess!T)
 		{
 			enum Elem = T.stringof ~ `.` ~ name;
+
 			alias attrs = TypeTuple!(__traits(getAttributes, __traits(getMember, T, name)));
 
 			debug
 			{
-				//static assert(allSatisfy!(isSomeString, attrs.Types), Elem ~ ` has not a string attribute`);
-
 				enum att = checkAttrs(attrs);
+
 				static assert(!att.length, Elem ~ ` has invalid attribute ` ~ att);
 			}
 
@@ -149,6 +150,34 @@ private:
 					reader.read(toByte(*varPtr)) || mixin(errorRead);
 				}
 			}
+			else static if(isAssociativeArray!R)
+			{
+				struct Pair
+				{
+					Unqual!(KeyType!R) key;
+					Unqual!(ValueType!R) value;
+				}
+
+				struct AA
+				{
+					mixin(`@(` ~ [ attrs ].to!string[1..$ - 1] ~ `) Pair[] ` ~ name ~ `;`);
+				}
+
+				AA aa;
+				auto arr = &aa.tupleof[0];
+
+				static if(isWrite)
+				{
+					*arr = p.byKeyValue.map!(a => Pair(a.key, a.value)).array;
+				}
+
+				process!isWrite(aa, st, data);
+
+				static if(!isWrite)
+				{
+					*p = map!(a => tuple(a.tupleof))(*arr).assocArray;
+				}
+			}
 			else static if(isArray!R)
 			{
 				alias E = ElementEncodingType!R;
@@ -211,6 +240,14 @@ private:
 				else
 				{
 					static assert(!(isLen || isRest), `static array ` ~ Elem ~ ` can't have a length`);
+				}
+
+				debug
+				{
+					static if(isLen)
+					{
+						//elemsCnt < 20 * 1024 * 1024 || throwErrorImpl(_f, _l, "length of %s.%s variable is too big(%s)", _info, name, elemsCnt);
+					}
 				}
 
 				static if(isElemSimple)
@@ -450,7 +487,7 @@ auto binaryRead(T, bool UseDup = false)(in void[] data, bool canRest = false, st
 	auto r = data.BinaryReader!(MemoryReader!UseDup);
 	auto v = r.read!T(f, l);
 
-	!r.reader.length || canRest || throwErrorImpl(f, l, `not all the buffer was parsed, %u bytes rest`, r.reader.length);
+	!r.reader.length || canRest || throwErrorImpl(f, l, `not all the buffer was parsed, %s bytes rest`, r.reader.length);
 	return v;
 }
 
