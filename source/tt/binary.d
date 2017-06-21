@@ -49,7 +49,7 @@ struct BinaryReader(Reader)
 private:
 	debug
 	{
-		enum errorRead = `throwErrorImpl(_f, _l, "can't read %s.%s variable", _info, st)`;
+		enum errorRead = `throwErrorImpl(_f, _l, "can't read %s.%s variable", _info, name)`;
 		enum errorWrite = `throwErrorImpl(_f, _l, "can't write %s.%s variable", _info, name)`;
 		enum errorRSkip = `throwErrorImpl(_f, _l, "can't skip when reading %s.%s variable", _info, name)`;
 		enum errorWSkip = `throwErrorImpl(_f, _l, "can't skip when writing %s.%s variable", _info, name)`;
