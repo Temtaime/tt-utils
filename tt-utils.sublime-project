@@ -9,10 +9,10 @@
 	[
 		{
 			"name": "dub",
-			"shell_cmd": "dub build --build=release",
+			"shell_cmd": "dub build --build=unittest",
 
 			"working_dir": "$project_path",
-			"file_regex": "^(.+)\\(([0-9]+),\\d+\\)(): (.+)$",
+			"file_regex": "^(.+)\\(([0-9]+)\\)(): (.+)$",
 		}
 	]
 }
