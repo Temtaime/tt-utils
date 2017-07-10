@@ -66,6 +66,8 @@ private:
 		enum errorValid = errorRead;
 	}
 
+	enum checkLength = `E.sizeof * elemsCnt < 512 * 1024 * 1024 || throwErrorImpl(_f, _l, "length of %s.%s variable is too big(%u)", _info, name, elemsCnt);`;
+
 	void process(bool isWrite = false, T, S, P)(ref T data, ref S st, ref P parent)
 	{
 		foreach(name; FieldsToProcess!T)
@@ -242,14 +244,6 @@ private:
 					static assert(!(isLen || isRest), `static array ` ~ Elem ~ ` can't have a length`);
 				}
 
-				debug
-				{
-					static if(isLen)
-					{
-						//elemsCnt < 20 * 1024 * 1024 || throwErrorImpl(_f, _l, "length of %s.%s variable is too big(%s)", _info, name, elemsCnt);
-					}
-				}
-
 				static if(isElemSimple)
 				{
 					static if(isWrite)
@@ -277,6 +271,8 @@ private:
 							}
 							else
 							{
+								mixin(checkLength);
+
 								reader.read(arr, elemsCnt * cast(uint)E.sizeof) || mixin(errorRead);
 							}
 
@@ -315,6 +311,8 @@ private:
 						{
 							static if(isDyn)
 							{
+								mixin(checkLength);
+
 								*varPtr = new E[elemsCnt];
 							}
 
