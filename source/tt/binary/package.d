@@ -71,7 +71,7 @@ private:
 
 	void process(bool isWrite = false, T, S, P)(ref T data, ref S st, ref P parent)
 	{
-		foreach(name; FieldsToProcess!T)
+		foreach(name; aliasSeqOf!(fieldsToProcess!T()))
 		{
 			enum Elem = T.stringof ~ `.` ~ name;
 
