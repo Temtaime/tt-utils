@@ -53,62 +53,57 @@ auto StructExecuter(alias _expr, D, S, P, R)(ref D CUR, ref S STRUCT, ref P PARE
 	}
 }
 
-template FieldsToProcess(T)
+@property fieldsToProcess(T)()
 {
-	auto gen()
+	int k, sz;
+
+	string u;
+	string[] res;
+
+	void add()
 	{
-		int k, sz;
-
-		string u;
-		string[] res;
-
-		void add()
+		if(u.length)
 		{
-			if(u.length)
-			{
-				res ~= u;
-				u = null;
-			}
+			res ~= u;
+			u = null;
 		}
+	}
 
-		foreach(name; __traits(allMembers, T))
+	foreach(name; __traits(allMembers, T))
+	{
+		static if(__traits(getProtection, mixin(`T.` ~ name)) == `public`)
 		{
-			static if(__traits(getProtection, mixin(`T.` ~ name)) == `public`)
+			alias E = Alias!(__traits(getMember, T, name));
+
+			static if(!(is(FunctionTypeOf!E == function) || hasUDA!(E, `ignore`)))
 			{
-				alias E = Alias!(__traits(getMember, T, name));
-
-				static if(!(is(FunctionTypeOf!E == function) || hasUDA!(E, `ignore`)))
+				static if(is(typeof(E.offsetof)) && isAssignable!(typeof(E)))
 				{
-					static if(is(typeof(E.offsetof)) && isAssignable!(typeof(E)))
-					{
-						uint x = E.offsetof, s = E.sizeof;
+					uint x = E.offsetof, s = E.sizeof;
 
-						if(k != x)
-						{
-							add;
-							u = name;
-
-							k = x;
-							sz = s;
-						}
-						else if(s > sz)
-						{
-							u = name;
-							sz = s;
-						}
-					}
-					else static if(__traits(compiles, &E) && is(typeof(E) == immutable))
+					if(k != x)
 					{
 						add;
-						res ~= name;
+						u = name;
+
+						k = x;
+						sz = s;
 					}
+					else if(s > sz)
+					{
+						u = name;
+						sz = s;
+					}
+				}
+				else static if(__traits(compiles, &E) && is(typeof(E) == immutable))
+				{
+					add;
+					res ~= name;
 				}
 			}
 		}
-
-		add;
-		return res;
 	}
 
-	enum FieldsToProcess = aliasSeqOf!(gen());
+	add;
+	return res;
 }
