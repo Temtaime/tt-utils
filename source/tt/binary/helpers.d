@@ -71,7 +71,7 @@ auto StructExecuter(alias _expr, D, S, P, R)(ref D CUR, ref S STRUCT, ref P PARE
 
 	foreach(name; __traits(allMembers, T))
 	{
-		static if(__traits(getProtection, mixin(`T.` ~ name)) == `public`)
+		static if(__traits(getProtection, __traits(getMember, T, name)) == `public`)
 		{
 			alias E = Alias!(__traits(getMember, T, name));
 
